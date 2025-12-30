@@ -187,26 +187,22 @@ class PomodoroTimer {
     finish() {
         this.isRunning = false;
         this.isPaused = false;
-        
-        this.startBtn.disabled = false;
-        this.startBtn.textContent = '开始计时';
-        this.pauseBtn.disabled = true;
-        this.timeInput.disabled = false;
-        this.statusText.textContent = '休息一下吧';
-        this.statusText.classList.add('blinking'); // 添加闪烁类
-        this.timerDisplay.classList.remove('running');
-        this.timerDisplay.classList.add('finished');
-        
+
         if (this.intervalId) {
             clearInterval(this.intervalId);
             this.intervalId = null;
         }
-        
+
         // 播放提示音
         this.playAlarm();
-        
+
         // 显示完成通知
         this.showNotification();
+
+        // 3秒后自动重置
+        setTimeout(() => {
+            this.reset();
+        }, 3000);
     }
     
     playAlarm() {
