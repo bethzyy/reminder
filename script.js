@@ -11,20 +11,34 @@ class PomodoroTimer {
         this.timerDisplay = document.querySelector('.timer-display');
         this.timeUnit = document.getElementById('timeUnit');
         this.progressBar = document.getElementById('progressBar');
-        
+
         this.totalSeconds = 0;
         this.remainingSeconds = 0;
         this.isRunning = false;
         this.isPaused = false;
         this.intervalId = null;
-        
+
         this.init();
+    }
+
+    log(message, data = '') {
+        const timestamp = new Date().toISOString();
+        const logMessage = `[${timestamp}] ${message} ${JSON.stringify(data)}\n`;
+        console.log(logMessage);
+
+        // 尝试写入日志文件
+        if (window.pywebview) {
+            window.pywebview.api.log(logMessage).catch(err => {
+                console.error('无法写入日志文件:', err);
+            });
+        }
     }
     
     init() {
         this.loadSavedTime();
         this.updateDisplay();
         this.bindEvents();
+        this.log('应用初始化完成');
     }
     
     loadSavedTime() {
@@ -196,33 +210,52 @@ class PomodoroTimer {
     }
     
     playAlarm() {
-        // 连续播放三次提示音
-        for (let i = 0; i < 3; i++) {
-            setTimeout(() => {
-                // 创建简单的提示音
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        this.log('开始播放铃声', { method: 'playAlarm' });
+
+        try {
+            // 创建一个3秒的悦耳旋律
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            this.log('AudioContext创建成功', { state: audioContext.state });
+
+            const gainNode = audioContext.createGain();
+            gainNode.connect(audioContext.destination);
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 3);
+
+            // 旋律音符序列（频率，开始时间，持续时间）
+            const notes = [
+                { freq: 523.25, start: 0.0, duration: 0.3 },    // C5
+                { freq: 587.33, start: 0.4, duration: 0.3 },    // D5
+                { freq: 659.25, start: 0.8, duration: 0.3 },    // E5
+                { freq: 783.99, start: 1.2, duration: 0.4 },    // G5
+                { freq: 659.25, start: 1.7, duration: 0.3 },    // E5
+                { freq: 523.25, start: 2.1, duration: 0.3 },    // C5
+                { freq: 783.99, start: 2.5, duration: 0.5 },    // G5 (结束音)
+            ];
+
+            this.log('准备播放音符序列', { noteCount: notes.length });
+
+            // 创建并播放每个音符
+            notes.forEach((note, index) => {
                 const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-                
+                oscillator.type = 'sine';
                 oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                
-                oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-                oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
-                oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.2);
-                
-                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-                
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 0.5);
-            }, i * 600); // 每次间隔600毫秒
+
+                oscillator.frequency.setValueAtTime(note.freq, audioContext.currentTime + note.start);
+                oscillator.start(audioContext.currentTime + note.start);
+                oscillator.stop(audioContext.currentTime + note.start + note.duration);
+
+                this.log(`音符 ${index + 1} 已调度`, {
+                    freq: note.freq,
+                    start: note.start,
+                    duration: note.duration
+                });
+            });
+
+            this.log('所有音符已成功调度播放');
+        } catch (error) {
+            this.log('播放铃声时出错', { error: error.message, stack: error.stack });
         }
-        
-        // 播放HTML audio元素三次作为备选
-        setTimeout(() => this.alarmSound.play().catch(() => {}), 0);
-        setTimeout(() => this.alarmSound.play().catch(() => {}), 600);
-        setTimeout(() => this.alarmSound.play().catch(() => {}), 1200);
     }
     
     showNotification() {
